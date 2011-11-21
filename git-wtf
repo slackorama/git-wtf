@@ -198,6 +198,8 @@ def show b
     end
   end
 
+  show_svn_info b
+
   puts "\n#{red "WARNING"}: local and remote branches have diverged. A merge will occur unless you rebase." if oosync
 end
 
@@ -254,6 +256,46 @@ def show_relations b, all_branches
         show_commits ahead unless $short
       end
     end
+  end
+end
+
+def show_svn_info b
+  svn_url = `git svn info --url`.chomp
+  if svn_url.empty?
+    return
+  end
+  branch = ''
+  if svn_url =~ /^.*\/branches\/(.*)$/
+    branch = $1
+  end
+  if branch.empty?
+    svn_branch = `git config --get svn-remote.svn.fetch`.chomp
+    if svn_branch =~ /^.*:refs\/remotes\/(.*)$/
+      branch = $1
+    end
+  end
+  pushc, pullc, oosync = [x = commits_between(branch, b[:local_branch]),
+     y = commits_between(b[:local_branch], branch),
+     !x.empty? && !y.empty?]
+  puts "SVN branch: #{cyan branch} (#{svn_url})"
+
+  puts "Local:"
+  if pushc.empty?
+    puts "#{widget true} in sync with svn"
+  else
+    action = oosync ? "dcommit after rebase" : "dcommit"
+    puts "#{widget false} NOT in sync with remote (you should #{action})"
+    show_commits pushc unless $short
+  end
+
+  puts "SVN Repo:"
+
+  if pullc.empty?
+    puts "#{widget true} in sync with local"
+  else
+    action = pushc.empty? ? "rebase" : "rebase / dcommit"
+    puts "#{widget false} NOT in sync with local (you should #{action})"
+    show_commits pullc unless $short
   end
 end
 
